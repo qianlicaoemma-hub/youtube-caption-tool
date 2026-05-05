@@ -451,7 +451,7 @@ def _yt_dlp_attempts(command: list[str], options: JobOptions) -> list[list[str]]
     if shutil.which("node"):
         base[1:1] = ["--js-runtimes", "node", "--remote-components", "ejs:github"]
 
-    if os.getenv("PUBLIC_MODE", "").strip().lower() in {"1", "true", "yes", "on"}:
+    if _is_public_mode():
         return [base]
 
     if options.cookies_file:
@@ -481,7 +481,30 @@ def _run_ytdlp(
         errors.append(detail[-1200:])
 
     final_error = errors[-1] if errors else "未知错误"
+    if _is_public_mode():
+        public_error = _public_youtube_error(final_error)
+        if public_error:
+            raise RuntimeError(f"{message}：{public_error}")
     raise RuntimeError(f"{message}：{final_error}")
+
+
+def _is_public_mode() -> bool:
+    return os.getenv("PUBLIC_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _public_youtube_error(error: str) -> str:
+    lowered = error.lower()
+    if "429" in lowered or "too many requests" in lowered or "not a bot" in lowered:
+        return (
+            "YouTube 对当前公开服务器请求做了风控限制。"
+            "请稍后重试，或换一个有公开字幕的视频。"
+        )
+    if "sign in" in lowered or "cookies" in lowered:
+        return (
+            "这个视频需要登录验证，公开版不会使用私人 YouTube 登录态。"
+            "请换一个有公开字幕、无需登录验证的视频。"
+        )
+    return ""
 
 
 def _append_cookie_args(command: list[str], options: JobOptions) -> None:
