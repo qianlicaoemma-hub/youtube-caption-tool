@@ -451,6 +451,9 @@ def _yt_dlp_attempts(command: list[str], options: JobOptions) -> list[list[str]]
     if shutil.which("node"):
         base[1:1] = ["--js-runtimes", "node", "--remote-components", "ejs:github"]
 
+    if os.getenv("PUBLIC_MODE", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return [base]
+
     if options.cookies_file:
         return [[*base, "--cookies", options.cookies_file]]
 

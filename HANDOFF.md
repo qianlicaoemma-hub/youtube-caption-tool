@@ -425,6 +425,7 @@ app/outputs/6512601d602f4dfaa1318500aae01447/segments/segment_004.json
   - `mode != "captions"`
   - `translate_to_zh=true`
   - `cookies_from_browser` / `cookies_file`
+- Public 模式下 `yt-dlp` 只做无 cookies 请求，不会 fallback 到 Chrome/Safari/Firefox/Edge cookies
 - Public 模式下 `/api/jobs/history` 和 `/jobs/{job_id}` 只暴露公开版字幕任务，避免泄露本地完整版历史任务
 - 本地完整版继续用 `PUBLIC_MODE=false` 或不设置，保留翻译、强制音频识别、断点续跑等能力
 
