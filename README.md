@@ -1,5 +1,7 @@
 # YouTube 逐字稿工具
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Fqianlicaoemma-hub%2Fyoutube-caption-tool)
+
 这是一个本地网页工具：粘贴 YouTube 链接，生成可复制到 Obsidian、飞书、Word 的逐字稿。
 
 ## 它会怎么处理
