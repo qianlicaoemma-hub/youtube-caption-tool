@@ -404,7 +404,40 @@ app/outputs/6512601d602f4dfaa1318500aae01447/segments/segment_004.json
 
 ## 当前重要问题
 
-### 今晚目标：公开字幕版
+### 当前产品定位：GitHub 本地运行工具
+
+最新决策：
+
+- 暂停“所有人都能用的公开网页工具”路线
+- 改成 GitHub 项目，让用户 clone 到自己电脑本地运行
+- 原因：
+  - YouTube 在 Render / 云服务器 IP 上容易触发 `Sign in to confirm you're not a bot`
+  - 用户浏览器已登录 YouTube，并不会自动把 youtube.com cookies 提供给 Render 后端
+  - 把用户 cookies 上传到公共服务有明显安全/隐私风险
+  - 本地运行可以读取用户自己的浏览器登录态，和 `cathyzhang0905/lenny-podcast-transcript` 的 fallback 思路一致
+  - OpenAI Key / 费用也由用户自己在本地 `.env` 配置和承担
+
+目标：
+
+- GitHub repo 公开
+- README 面向本地用户
+- 保留完整 Private 功能：
+  - YouTube 字幕读取
+  - YouTube 浏览器登录态
+  - 中文逐字翻译
+  - 强制音频识别
+  - 断点续跑
+  - 历史任务查看
+- `PUBLIC_MODE` 仍保留，但标记为实验性，不推荐作为公共服务主路线
+
+下一步：
+
+1. 更新 README：改成本地安装/运行说明为主
+2. 更新 DEPLOY：明确 Render/Public 只是实验性，云端会受 YouTube 风控影响
+3. 更新 GitHub repo 可见性为 Public
+4. 建议暂停或删除 Render service，避免误导公开用户
+
+### 已实现但暂停主推：公开字幕版
 
 目标：
 
