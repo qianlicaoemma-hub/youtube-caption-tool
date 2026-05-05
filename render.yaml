@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: youtube-caption-tool
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: PUBLIC_MODE
+        value: "true"
