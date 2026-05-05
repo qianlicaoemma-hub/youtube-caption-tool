@@ -459,6 +459,20 @@ PUBLIC_MODE=true .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 本地使用不受 Public 模式影响，仍需正常支持翻译和强制音频识别。
 
+GitHub 仓库：
+
+```text
+https://github.com/qianlicaoemma-hub/youtube-caption-tool
+```
+
+状态：
+
+- 已初始化为独立 git 仓库
+- 已创建私有 GitHub repo
+- 已推送 `main`
+- README 已加入 Render 部署按钮
+- Render CLI 本机未安装；下一步需要用户在 Render 网页登录并授权 GitHub repo
+
 ### 1. OpenAI 音频识别不稳定
 
 用户已经花了大约 `$0.92`，但之前因连接失败没有看到完整音频识别结果。
