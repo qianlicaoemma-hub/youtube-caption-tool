@@ -70,7 +70,10 @@ def get_config() -> dict[str, Any]:
 
 
 @app.post("/api/jobs")
-def create_job(payload: CreateJobRequest, background_tasks: BackgroundTasks) -> dict[str, str]:
+def create_job(
+    payload: CreateJobRequest,
+    background_tasks: BackgroundTasks,
+) -> dict[str, str]:
     _validate_public_request(payload)
 
     options = JobOptions(
