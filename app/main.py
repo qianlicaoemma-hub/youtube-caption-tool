@@ -27,6 +27,7 @@ STATIC_DIR = BASE_DIR / "static"
 TMP_DIR = BASE_DIR / "tmp"
 OUTPUT_DIR = BASE_DIR / "outputs"
 PUBLIC_MODE = os.getenv("PUBLIC_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
+JOB_SIGNATURE_VERSION = "2026-05-10-bilingual-captions-v3"
 
 TMP_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -278,7 +279,14 @@ def _options_payload(options: JobOptions) -> dict[str, Any]:
 
 
 def _job_signature(options: JobOptions) -> str:
-    payload = json.dumps(_options_payload(options), ensure_ascii=False, sort_keys=True)
+    payload = json.dumps(
+        {
+            "version": JOB_SIGNATURE_VERSION,
+            "options": _options_payload(options),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

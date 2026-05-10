@@ -51,10 +51,12 @@ def run_transcription(
         if options.mode in {"auto", "captions"}:
             try:
                 progress("正在尝试读取 YouTube 自带字幕。")
-                caption_text = _download_and_parse_captions(options, work_dir / "captions")
-                if caption_text:
-                    cleaned = _group_sentences(_light_cleanup(caption_text))
-                    blocks = [TranscriptBlock("Speaker 1", cleaned)]
+                caption_blocks = _download_and_parse_captions(options, work_dir / "captions")
+                if caption_blocks:
+                    blocks = [
+                        TranscriptBlock(block.speaker, _group_sentences(_light_cleanup(block.text)))
+                        for block in caption_blocks
+                    ]
                     files = _write_outputs(output_dir, title, options.url, blocks,
                                            "YouTube captions", uploader)
                     completed = True
@@ -213,7 +215,7 @@ def _download_audio(options: JobOptions, output_dir: Path) -> Path:
     return max(candidates, key=lambda path: path.stat().st_size)
 
 
-def _download_and_parse_captions(options: JobOptions, output_dir: Path) -> str:
+def _download_and_parse_captions(options: JobOptions, output_dir: Path) -> list[TranscriptBlock]:
     shutil.rmtree(output_dir, ignore_errors=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -235,28 +237,62 @@ def _download_and_parse_captions(options: JobOptions, output_dir: Path) -> str:
     _run_ytdlp(command, options, "读取字幕失败")
 
     vtt_files = sorted(output_dir.glob("*.vtt"), key=_caption_priority)
+    if options.language == "auto":
+        english_text = ""
+        chinese_text = ""
+        for path in vtt_files:
+            text = _parse_vtt(path.read_text(encoding="utf-8", errors="ignore"))
+            if len(text) <= 200:
+                continue
+            if not english_text and _is_english_caption(path):
+                english_text = text
+            elif not chinese_text and _is_chinese_caption(path):
+                chinese_text = text
+            if english_text and chinese_text:
+                break
+
+        blocks: list[TranscriptBlock] = []
+        if english_text:
+            blocks.append(TranscriptBlock("English", english_text))
+        if chinese_text:
+            blocks.append(TranscriptBlock("中文", chinese_text))
+        if blocks:
+            return blocks
+
     for path in vtt_files:
         text = _parse_vtt(path.read_text(encoding="utf-8", errors="ignore"))
         if len(text) > 200:
-            return text
-    return ""
+            return [TranscriptBlock("Speaker 1", text)]
+    return []
 
 
 def _subtitle_languages(language: str) -> str:
     if language == "zh":
-        return "zh.*,zh-Hans,zh-Hant,zh-CN,zh-TW"
+        return "zh-CN,zh-TW,zh-Hans,zh-Hant,zh"
     if language == "en":
-        return "en.*,en"
-    return "zh.*,zh-Hans,zh-Hant,zh-CN,zh-TW,en.*,en"
+        return "en-orig,en"
+    return "en-orig,en,zh-CN,zh-TW,zh-Hans,zh-Hant,zh"
 
 
 def _caption_priority(path: Path) -> tuple[int, str]:
     name = path.name.lower()
-    if ".zh" in name or "chinese" in name:
+    if ".en-orig" in name:
         return (0, name)
     if ".en" in name or "english" in name:
         return (1, name)
-    return (2, name)
+    if ".zh" in name or "chinese" in name:
+        return (2, name)
+    return (3, name)
+
+
+def _is_english_caption(path: Path) -> bool:
+    name = path.name.lower()
+    return ".en-orig" in name or ".en." in name or name.endswith(".en.vtt") or "english" in name
+
+
+def _is_chinese_caption(path: Path) -> bool:
+    name = path.name.lower()
+    return ".zh" in name or "chinese" in name
 
 
 def _get_metadata(options: JobOptions, progress: Progress) -> dict[str, str]:
