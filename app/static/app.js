@@ -3,7 +3,6 @@ const urlInput = document.querySelector("#urlInput");
 const modeInput = document.querySelector("#modeInput");
 const languageInput = document.querySelector("#languageInput");
 const browserInput = document.querySelector("#browserInput");
-const translateInput = document.querySelector("#translateInput");
 const statusText = document.querySelector("#statusText");
 const progressText = document.querySelector("#progressText");
 const submitButton = document.querySelector("#submitButton");
@@ -16,7 +15,6 @@ const docxLink = document.querySelector("#docxLink");
 const streamingIndicator = document.querySelector("#streamingIndicator");
 const modeField = document.querySelector("#modeField");
 const browserField = document.querySelector("#browserField");
-const translateField = document.querySelector("#translateField");
 const publicNotice = document.querySelector("#publicNotice");
 
 let currentText = "";
@@ -25,7 +23,7 @@ let currentJobId = "";
 let appConfig = {
   public_mode: false,
   allow_audio: true,
-  allow_translation: true,
+  allow_translation: false,
   allow_browser_cookies: true,
 };
 
@@ -42,7 +40,7 @@ form.addEventListener("submit", async (event) => {
       mode: appConfig.public_mode ? "captions" : modeInput.value,
       language: languageInput.value,
       cookies_from_browser: appConfig.allow_browser_cookies ? browserInput.value : "",
-      translate_to_zh: appConfig.allow_translation ? translateInput.checked : false,
+      translate_to_zh: false,
     };
 
     const didOpenHistory = await maybeOpenHistoricalJob(payload);
@@ -117,10 +115,8 @@ function applyConfig() {
   modeInput.disabled = true;
   browserInput.value = "";
   browserInput.disabled = true;
-  translateInput.checked = false;
-  translateInput.disabled = true;
 
-  for (const element of [modeField, browserField, translateField]) {
+  for (const element of [modeField, browserField]) {
     if (element) element.hidden = true;
   }
   if (publicNotice) publicNotice.hidden = false;
@@ -227,7 +223,7 @@ async function maybeOpenHistoricalJob(payload) {
     `当前设置：${describeOptions(payload)}`,
     "",
     "打开历史结果吗？",
-    "选择“取消”会继续按当前设置新建任务，可能产生 OpenAI 费用。",
+    "选择“取消”会继续按当前设置新建任务，可能产生火山引擎识别费用。",
   ].join("\n");
 
   if (!window.confirm(message)) {
@@ -272,7 +268,7 @@ function resetResult() {
 
 function setBusy(isBusy) {
   submitButton.disabled = isBusy;
-  submitButton.querySelector("span").textContent = isBusy ? "处理中" : "生成逐字稿";
+  submitButton.querySelector("span").textContent = isBusy ? "处理中" : "识别";
 }
 
 function showError(error) {
@@ -319,8 +315,7 @@ function settingsMatch(options, payload) {
   return (
     (options.mode || "auto") === payload.mode &&
     (options.language || "auto") === payload.language &&
-    (options.cookies_from_browser || "") === (payload.cookies_from_browser || "") &&
-    Boolean(options.translate_to_zh) === Boolean(payload.translate_to_zh)
+    (options.cookies_from_browser || "") === (payload.cookies_from_browser || "")
   );
 }
 
@@ -329,14 +324,13 @@ function describeOptions(options) {
     modeLabel(options.mode || "auto"),
     languageLabel(options.language || "auto"),
     browserLabel(options.cookies_from_browser || ""),
-    options.translate_to_zh ? "含中文翻译" : "不含中文翻译",
   ].join(" / ");
 }
 
 function modeLabel(value) {
-  if (value === "audio") return "强制音频识别";
-  if (value === "captions") return "只读取字幕";
-  return "字幕优先";
+  if (value === "audio") return "AI 转录";
+  if (value === "captions") return "仅用字幕";
+  return "自动";
 }
 
 function languageLabel(value) {
@@ -422,3 +416,172 @@ async function postJson(url) {
 
   return data;
 }
+
+/* ============================================================
+ * 以下是 UI 重设计追加的辅助逻辑（不修改上面任何已有函数）。
+ * 1. 侧栏：最近任务列表
+ * 2. 输入框下方的示例 chip：填充 URL，不自动提交
+ * 3. 移动端侧栏开关
+ * ============================================================ */
+
+const recentList = document.querySelector("#recentList");
+const sidebarEl = document.querySelector("#sidebar");
+const sidebarToggle = document.querySelector("#sidebarToggle");
+
+async function loadRecentJobs() {
+  if (!recentList) return;
+  try {
+    const response = await fetch("/api/jobs/recent?limit=12");
+    if (!response.ok) return;
+    const data = await response.json();
+    renderRecentJobs(Array.isArray(data.jobs) ? data.jobs : []);
+  } catch {
+    /* 静默失败：侧栏可用即可，不阻塞主流程 */
+  }
+}
+
+function renderRecentJobs(jobs) {
+  if (!recentList) return;
+  if (!jobs.length) {
+    recentList.innerHTML = '<p class="recent-empty">还没有任务。<br/>粘贴一个链接开始。</p>';
+    return;
+  }
+  recentList.innerHTML = jobs.map(jobToCard).join("");
+}
+
+function jobToCard(job) {
+  const isZh =
+    (job.language && job.language === "zh") ||
+    /[一-鿿]/.test(job.title || "");
+  const badgeClass = isZh ? "badge-zh" : "badge-en";
+  const badgeText = isZh ? "中" : "EN";
+  const title = escapeHtml(job.title || "未命名");
+  const subParts = [
+    escapeHtml(job.uploader || ""),
+    statusHint(job),
+    relativeTime(job.updated_at),
+  ].filter(Boolean);
+  const sub = subParts.join(" · ");
+  const isActive = job.id && job.id === currentJobId;
+  return `
+    <a href="/jobs/${job.id}" class="recent-card${isActive ? " is-active" : ""}" data-job-id="${job.id}">
+      <span class="lang-badge ${badgeClass}">${badgeText}</span>
+      <span class="recent-text">
+        <span class="recent-title">${title}</span>
+        <span class="recent-sub">${sub}</span>
+      </span>
+    </a>`;
+}
+
+function statusHint(job) {
+  if (job.status === "running") return "处理中";
+  if (job.status === "queued") return "排队中";
+  if (job.status === "error") return "失败";
+  return "";
+}
+
+function relativeTime(ts) {
+  if (!ts) return "";
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+  if (seconds < 60) return "刚刚";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时前`;
+  if (seconds < 86400 * 7) return `${Math.floor(seconds / 86400)} 天前`;
+  const d = new Date(ts * 1000);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[c]);
+}
+
+/* 示例 URL chip：只填充输入框，不自动提交 */
+document.querySelectorAll("[data-example-url]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const url = btn.getAttribute("data-example-url") || "";
+    if (!urlInput) return;
+    urlInput.value = url;
+    urlInput.focus();
+  });
+});
+
+/* 提交后稍后刷新一次侧栏，让新任务尽快出现 */
+form.addEventListener("submit", () => {
+  setTimeout(loadRecentJobs, 2500);
+});
+
+/* 移动端侧栏开关 */
+if (sidebarToggle && sidebarEl) {
+  sidebarToggle.addEventListener("click", () => {
+    sidebarEl.classList.toggle("is-open");
+  });
+  /* 点击侧栏内的链接后自动收起 */
+  sidebarEl.addEventListener("click", (event) => {
+    if (event.target.closest(".recent-card")) {
+      sidebarEl.classList.remove("is-open");
+    }
+  });
+}
+
+/* 桌面端：侧栏宽度可拖拽 */
+const sidebarResizer = document.querySelector("#sidebarResizer");
+if (sidebarResizer) {
+  const SIDEBAR_MIN = 180;
+  const SIDEBAR_MAX = 480;
+  const STORAGE_KEY = "verbatim:sidebarWidth";
+
+  // 启动时恢复保存的宽度
+  const savedWidth = parseInt(localStorage.getItem(STORAGE_KEY) || "", 10);
+  if (savedWidth >= SIDEBAR_MIN && savedWidth <= SIDEBAR_MAX) {
+    document.documentElement.style.setProperty("--sidebar-width", `${savedWidth}px`);
+  }
+
+  let isResizing = false;
+  let pendingWidth = 0;
+
+  function applyWidth(width) {
+    pendingWidth = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.round(width)));
+    document.documentElement.style.setProperty("--sidebar-width", `${pendingWidth}px`);
+  }
+
+  sidebarResizer.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    isResizing = true;
+    sidebarResizer.classList.add("is-dragging");
+    document.body.classList.add("is-resizing");
+  });
+
+  document.addEventListener("mousemove", (event) => {
+    if (!isResizing) return;
+    applyWidth(event.clientX);
+  });
+
+  function stopResize() {
+    if (!isResizing) return;
+    isResizing = false;
+    sidebarResizer.classList.remove("is-dragging");
+    document.body.classList.remove("is-resizing");
+    if (pendingWidth) {
+      localStorage.setItem(STORAGE_KEY, String(pendingWidth));
+    }
+  }
+
+  document.addEventListener("mouseup", stopResize);
+  document.addEventListener("mouseleave", stopResize);
+
+  // 双击手柄重置默认宽度
+  sidebarResizer.addEventListener("dblclick", () => {
+    document.documentElement.style.removeProperty("--sidebar-width");
+    localStorage.removeItem(STORAGE_KEY);
+  });
+}
+
+/* 启动加载 + 30 秒一次自动刷新 */
+loadRecentJobs();
+setInterval(loadRecentJobs, 30000);

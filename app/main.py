@@ -46,6 +46,7 @@ class CreateJobRequest(BaseModel):
         pattern="^(|auto|chrome|chrome:Default|chrome:Profile 1|chrome:Profile 12|safari|firefox|edge)$",
     )
     cookies_file: str = ""
+    # translate_to_zh 字段保留兼容历史 job.json，但 UI 已移除翻译选项
     translate_to_zh: bool = False
 
 
@@ -64,7 +65,7 @@ def get_config() -> dict[str, Any]:
     return {
         "public_mode": PUBLIC_MODE,
         "allow_audio": not PUBLIC_MODE,
-        "allow_translation": not PUBLIC_MODE,
+        "allow_translation": False,  # 暂未启用翻译模块
         "allow_browser_cookies": not PUBLIC_MODE,
     }
 
@@ -113,6 +114,12 @@ def create_job(
 @app.get("/api/jobs/history")
 def job_history(url: str) -> dict[str, Any]:
     return {"jobs": _jobs_for_url(url.strip())}
+
+
+@app.get("/api/jobs/recent")
+def recent_jobs(limit: int = 12) -> dict[str, Any]:
+    """侧栏用：返回最近完成或处理中的任务列表。"""
+    return {"jobs": _recent_jobs(limit)}
 
 
 @app.get("/api/jobs/{job_id}")
@@ -367,8 +374,32 @@ def _job_history_item(job: dict[str, Any]) -> dict[str, Any]:
         "error": job.get("error"),
         "updated_at": job.get("updated_at"),
         "title": result.get("title") or "历史任务",
+        "uploader": result.get("uploader") or "",
+        "language": (job.get("options") or {}).get("language") or "auto",
+        "url": (job.get("options") or {}).get("url") or "",
         "options": job.get("options") if isinstance(job.get("options"), dict) else {},
     }
+
+
+def _recent_jobs(limit: int = 12) -> list[dict[str, Any]]:
+    """所有任务里取最近 N 条，用于侧栏展示。"""
+    items: list[dict[str, Any]] = []
+    for path in OUTPUT_DIR.glob("*/job.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        options = data.get("options")
+        if not isinstance(options, dict):
+            continue
+        if PUBLIC_MODE and not _is_public_options(options):
+            continue
+        items.append(_job_history_item(data))
+
+    items.sort(key=_history_sort_key, reverse=True)
+    return items[:limit]
 
 
 def _history_sort_key(job: dict[str, Any]) -> tuple[int, float]:
@@ -409,8 +440,6 @@ def _validate_public_request(payload: CreateJobRequest) -> None:
         return
     if payload.mode != "captions":
         raise HTTPException(status_code=403, detail="公开版只支持读取 YouTube 字幕，不支持音频识别。")
-    if payload.translate_to_zh:
-        raise HTTPException(status_code=403, detail="公开版暂不支持中文翻译。")
     if payload.cookies_from_browser:
         raise HTTPException(status_code=403, detail="公开版不使用本机浏览器登录态。")
     if payload.cookies_file.strip():
@@ -428,7 +457,6 @@ def _ensure_public_job_visible(job: dict[str, Any]) -> None:
 def _is_public_options(options: dict[str, Any]) -> bool:
     return (
         options.get("mode") == "captions"
-        and not bool(options.get("translate_to_zh"))
         and not options.get("cookies_from_browser")
         and not options.get("cookies_file")
     )
