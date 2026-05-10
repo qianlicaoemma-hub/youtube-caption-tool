@@ -62,18 +62,6 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 **关闭工具**：在终端按 `Ctrl + C`，或直接关掉 `start.command` 启动的终端窗口。
 
-## YouTube 要求登录怎么办
-
-如果遇到：
-
-```text
-Sign in to confirm you're not a bot
-```
-
-先在本机浏览器里登录 YouTube，然后在页面的"YouTube 登录态"里选择你正在使用的浏览器（Chrome、Safari、Firefox、Edge 等）。
-
-这会让 `yt-dlp` 读取你自己本机的 YouTube 登录状态。登录态不会提交到 GitHub，也不应该上传到公共服务器。
-
 ## 成本说明
 
 | 视频类型 | 处理方式 | 4 小时视频成本 |
@@ -103,6 +91,18 @@ Sign in to confirm you're not a bot
 3. 用自己电脑跑（音频识别不能共享他人 API Key，否则会泄露成本）
 
 **如果朋友不想注册火山账号**：他们仍可以使用工具，但只有 YouTube 自带字幕的视频能转。在「高级设置」→「处理方式」里选「仅用字幕（无字幕则报错）」即可。这种用法零成本、无需任何 API Key。
+
+## YouTube 要求登录怎么办
+
+如果遇到：
+
+```text
+Sign in to confirm you're not a bot
+```
+
+先在本机浏览器里登录 YouTube，然后在页面的"YouTube 登录态"里选择你正在使用的浏览器（Chrome、Safari、Firefox、Edge 等）。
+
+这会让 `yt-dlp` 读取你自己本机的 YouTube 登录状态。登录态不会提交到 GitHub，也不应该上传到公共服务器。
 
 ## 为什么不推荐公开部署
 
